@@ -1,0 +1,8 @@
+name: NeoProtect
+main: ru.SocialMoods.NeoProtect
+version: "1.0.0"
+api: ["1.0.0"]
+description: Анархичные приваты - для каждого. От SkyStudio
+commands:
+  verify:
+    description: "Подтвердить свой Telegram"

@@ -14,11 +14,11 @@ public class TgBot {
 
     public TgBot(NeoProtect plugin) {
         this.plugin = plugin;
-        String botToken = plugin.config.getString("bot-token");
+        String botToken = plugin.config.getString("bot.token");
         if (!botToken.isEmpty()) {
             this.bot = new TelegramBot(botToken);
         } else {
-            plugin.getLogger().error(plugin.config.getString("messages.bot-token-error", "Установите токен для бота в конфиге!"));
+            plugin.getLogger().error(plugin.getConfig().getString("bot.messages.bot-token-error", "Установите токен для бота в конфиге!"));
         }
 
         bot.setUpdatesListener(updates -> {
@@ -38,14 +38,14 @@ public class TgBot {
         Long chatId = update.message().chat().id();
 
         if ("/start".equals(messageText)) {
-            String startMessage = plugin.config.getString("messages.start-message", "Привет! Нажми на инлайн-кнопку!");
-            String buttonText = plugin.config.getString("messages.start-button-text", "Туториал");
+            String startMessage = plugin.config.getString("bot.messages.start-message", "Привет! Нажми на инлайн-кнопку!");
+            String buttonText = plugin.config.getString("bot.messages.start-button-text", "Туториал");
             InlineKeyboardMarkup inlineKeyboard = new InlineKeyboardMarkup(new InlineKeyboardButton(buttonText).callbackData("tutorial"));
             sendMessageWithKeyboard(chatId, startMessage, inlineKeyboard);
         } else if (messageText.startsWith("/verify ")) {
             String code = messageText.split(" ")[1];
             plugin.verifyTelegramCode(code, chatId);
-            sendMessage(chatId, plugin.config.getString("messages.verification-success", "Верификация завершена."));
+            sendMessage(chatId, plugin.config.getString("bot.messages.verification-success", "Верификация завершена."));
         }
     }
 
@@ -55,7 +55,7 @@ public class TgBot {
         String callbackId = update.callbackQuery().id();
 
         if ("tutorial".equals(callbackData)) {
-            sendMessage(chatId, plugin.config.getString("messages.tuturial", "Настройте текст туториала в конфиге!"));
+            sendMessage(chatId, plugin.config.getString("bot.messages.tutorial", "Настройте текст туториала в конфиге!"));
         }
 
         bot.execute(new AnswerCallbackQuery(callbackId));
@@ -69,5 +69,10 @@ public class TgBot {
     public void sendMessageWithKeyboard(Long chatId, String message, InlineKeyboardMarkup keyboard) {
         SendMessage request = new SendMessage(chatId, message).replyMarkup(keyboard);
         bot.execute(request);
+    }
+
+    public boolean isNotificationsEnabled(Long chatId) {
+        String playerName = plugin.getPlayerNameByChatId(chatId);
+        return plugin.config.getBoolean("notifications." + playerName, false);
     }
 }

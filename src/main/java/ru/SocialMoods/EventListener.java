@@ -10,6 +10,7 @@ import cn.nukkit.event.block.BlockPlaceEvent;
 import cn.nukkit.event.entity.EntityExplodeEvent;
 import cn.nukkit.event.player.PlayerInteractEvent;
 import cn.nukkit.level.Location;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -17,12 +18,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+
 import ru.SocialMoods.Storage.Areas;
 
 public class EventListener implements Listener {
-    private NeoProtect plugin;
+    private final NeoProtect plugin;
     private Map<Integer, Integer> protectionBlocks;
-    private int maximumProtections;
+    private final int maximumProtections;
 
     public EventListener(NeoProtect plugin) {
         this.plugin = plugin;
@@ -34,7 +36,7 @@ public class EventListener implements Listener {
         this.maximumProtections = plugin.config.getInt("maximum-protections");
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onExplode(EntityExplodeEvent event) {
         List<Block> list = event.getBlockList();
         String owner = null;
@@ -51,18 +53,22 @@ public class EventListener implements Listener {
         if (owner != null && explosionLocation != null) {
             Long chatId = this.plugin.getChatIdByPlayerName(owner);
             if (chatId != null) {
-                String messageTemplate = this.plugin.config.getString("messages.explosion-detected", "Взрыв произошел в вашем регионе. Координаты: {x}, {y}, {z}");
-                String message = messageTemplate
-                        .replace("{x}", String.valueOf(explosionLocation.getX()))
-                        .replace("{y}", String.valueOf(explosionLocation.getY()))
-                        .replace("{z}", String.valueOf(explosionLocation.getZ()));
-                this.plugin.getTgBot().sendMessage(chatId, message);
+                boolean sendExplosionNotifications = this.plugin.config.getBoolean("notifications." + owner, true);
+
+                if (sendExplosionNotifications) {
+                    String messageTemplate = this.plugin.config.getString("messages.explosion-detected", "Взрыв произошел в вашем регионе. Координаты: {x}, {y}, {z}");
+                    String message = messageTemplate
+                            .replace("{x}", String.valueOf(explosionLocation.getX()))
+                            .replace("{y}", String.valueOf(explosionLocation.getY()))
+                            .replace("{z}", String.valueOf(explosionLocation.getZ()));
+                    this.plugin.getTgBot().sendMessage(chatId, message);
+                }
                 playerRemoveProtection(explosionLocation, plugin.getServer().getPlayer(owner));
             }
         }
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         Block block = event.getBlock();
@@ -72,7 +78,7 @@ public class EventListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onBlockBreak(BlockBreakEvent event) {
         Player player = event.getPlayer();
         Block block = event.getBlock();
@@ -88,7 +94,7 @@ public class EventListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    @EventHandler(priority = EventPriority.NORMAL)
     public void onBlockPlace(BlockPlaceEvent event) {
         Player player = event.getPlayer();
         Block block = event.getBlock();
@@ -124,6 +130,10 @@ public class EventListener implements Listener {
         } else if (this.playerInRangeProtection(block.getLocation(), player)) {
             event.setCancelled(true);
         }
+    }
+
+    public int getProtectionRadius(int blockId) {
+        return protectionBlocks.getOrDefault(blockId, 0);
     }
 
     private String getOwnerByLocation(Location loc) {
@@ -165,20 +175,84 @@ public class EventListener implements Listener {
         return false;
     }
 
+    public void addPlayerToRegion(String owner, String playerToAdd, Location loc) {
+        List<Areas> areas = this.plugin.map.get(owner);
+        if (areas != null) {
+            for (Areas area : areas) {
+                if (area.getLocation().equals(loc)) {
+                    area.addPlayer(playerToAdd);
+                    Player ownerPlayer = this.plugin.getServer().getPlayer(owner);
+                    if (ownerPlayer != null) {
+                        ownerPlayer.sendMessage(this.getMessage("player-added").replace("%player%", playerToAdd));
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    public void removePlayerFromRegion(String owner, String playerToRemove, Location loc) {
+        List<Areas> areas = this.plugin.map.get(owner);
+        if (areas != null) {
+            for (Areas area : areas) {
+                if (area.getLocation().equals(loc)) {
+                    area.removePlayer(playerToRemove);
+                    Player ownerPlayer = this.plugin.getServer().getPlayer(owner);
+                    if (ownerPlayer != null) {
+                        ownerPlayer.sendMessage(this.getMessage("player-removed").replace("%player%", playerToRemove));
+                    }
+                    return;
+                }
+            }
+        }
+    }
+
+    public void transferRegionOwnership(String currentOwner, String newOwner, Location loc) {
+        List<Areas> areas = this.plugin.map.get(currentOwner);
+        if (areas != null) {
+            Iterator<Areas> iterator = areas.iterator();
+            while (iterator.hasNext()) {
+                Areas area = iterator.next();
+                if (area.getLocation().equals(loc)) {
+                    iterator.remove();
+                    List<Areas> newOwnerAreas = this.plugin.map.getOrDefault(newOwner, new ArrayList<>());
+                    newOwnerAreas.add(area);
+                    this.plugin.map.put(newOwner, newOwnerAreas);
+
+                    Player currentOwnerPlayer = this.plugin.getServer().getPlayer(currentOwner);
+                    if (currentOwnerPlayer != null) {
+                        currentOwnerPlayer.sendMessage(this.getMessage("ownership-transferred").replace("%new_owner%", newOwner));
+                    }
+
+                    Player newOwnerPlayer = this.plugin.getServer().getPlayer(newOwner);
+                    if (newOwnerPlayer != null) {
+                        newOwnerPlayer.sendMessage(this.getMessage("new-owner").replace("%region%", loc.toString()));
+                    }
+
+                    return;
+                }
+            }
+        }
+    }
+
     private boolean playerInRangeProtection(Location loc, Player player) {
         Set<Entry<String, List<Areas>>> set = this.plugin.map.entrySet();
         for (Entry<String, List<Areas>> entry : set) {
+            String owner = entry.getKey();
             List<Areas> areas = entry.getValue();
             for (Areas area : areas) {
                 if (loc.distance(area.getLocation()) < this.protectionBlocks.getOrDefault(area.getBlockId(), 0)) {
-                    if (!entry.getKey().equals(player.getName())) {
-                        player.sendPopup(this.getMessage("area-owned-popup").replace("%owner%", entry.getKey()));
+                    if (!owner.equals(player.getName()) && !area.isAllowed(player.getName())) {
+                        player.sendPopup(this.getMessage("area-owned-popup").replace("%owner%", owner));
                         return true;
                     }
                 }
             }
         }
         return false;
+    }
+    private String getMessage(String key) {
+        return this.plugin.config.getString("messages." + key, "Ошибка в конфиге " + key);
     }
 
     private boolean blockInProtection(Location loc) {
@@ -196,19 +270,15 @@ public class EventListener implements Listener {
 
     private List<Location> ProtectionArea(Location loc, int radius) {
         List<Location> list = new ArrayList<>();
-        double y = loc.y;
 
         for (double i = 0.0D; i < 360.0D; i += 0.1D) {
             double angle = i * Math.PI / 180.0D;
             double x = loc.getX() + radius * Math.cos(angle);
+            double y = loc.getY() + radius * Math.cos(angle);
             double z = loc.getZ() + radius * Math.sin(angle);
-            list.add(new Location(x, y, z));
+            list.add(new Location(x, y, z, loc.getLevel()));
         }
 
         return list;
-    }
-
-    private String getMessage(String key) {
-        return this.plugin.config.getString("messages." + key, "Сообщение не найдено: " + key);
     }
 }

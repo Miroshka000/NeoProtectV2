@@ -1,11 +1,15 @@
 package ru.SocialMoods;
 
+import cn.nukkit.Player;
 import cn.nukkit.command.Command;
 import cn.nukkit.command.CommandSender;
 import cn.nukkit.event.Listener;
+import cn.nukkit.level.Location;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.scheduler.NukkitRunnable;
 import cn.nukkit.utils.Config;
 import cn.nukkit.utils.TextFormat;
+import ru.SocialMoods.Form.RegionFormManager;
 import ru.SocialMoods.Storage.Areas;
 import ru.SocialMoods.Storage.Stream;
 
@@ -19,14 +23,25 @@ public class NeoProtect extends PluginBase implements Listener {
     public Config config;
     private Map<String, VerificationCode> verificationCodes;
     private TgBot tgBot;
+    private EventListener listener;
+
+    public NeoProtect() {
+    }
+
+    public NeoProtect(EventListener listener) {
+        this.listener = listener;
+    }
+
+    public EventListener getListener() {
+        return listener;
+    }
 
     @Override
     public void onEnable() {
         getLogger().info("NeoProtect включен!");
         getLogger().info("Переработано SkyStudio");
-
         getDataFolder().mkdirs();
-        
+
         File configFile = new File(this.getDataFolder(), "config.yml");
 
         if (!configFile.exists()) {
@@ -44,8 +59,19 @@ public class NeoProtect extends PluginBase implements Listener {
 
         tgBot = new TgBot(this);
 
-        getServer().getPluginManager().registerEvents(new EventListener(this), this);
+        this.listener = new EventListener(this);
+        getServer().getPluginManager().registerEvents(listener, this);
+
+        new NukkitRunnable() {
+            @Override
+            public void run() {
+                stream.save();
+            }
+        }.runTaskTimer(this, 6000, 6000);
     }
+
+    @Override
+    public void onDisable() {stream.save();}
 
     private LinkedHashMap<String, Object> createDefaultConfig() {
         return new LinkedHashMap<String, Object>() {
@@ -57,7 +83,7 @@ public class NeoProtect extends PluginBase implements Listener {
                     }
                 });
                 put("maximum-protections", 5);
-                put("bot-token", "Вставьте свой токен телеграмм бота, если не вставите, возможен спам в консоли");
+                put("particles-enabled", true);
                 put("messages", new LinkedHashMap<String, String>() {
                     {
                         put("explosion-detected", "Взрыв произошел в вашем регионе. Координаты: {x}, {y}, {z}");
@@ -71,16 +97,47 @@ public class NeoProtect extends PluginBase implements Listener {
                         put("protection-radius-created", "Радиус защиты %radius% блоков создан вокруг вашего защитного блока.");
                         put("area-protected-popup", "Область внутри стеклянного круга защищена.");
                         put("area-owned-popup", "Вы находитесь в защищенной области, принадлежащей: %owner%");
-                        put("bot-token-error", "Установите токен для бота в конфиге!");
-                        put("start-message", "Привет! Ты в телеграмм боте плагина NeoProtect. Данный плагин позволяет получать уведомления о рейдах на приват.");
-                        put("start-button-text", "Как подключить?");
-                        put("start-chat-id", "Ваш айди чата: {chat_id}");
-                        put("verification-success", "Верификация завершена.");
-                        put("tutorial", "Для подключения аккаунта введите команду /verify на сервере!");
-                        put("verify-code", "Ваш код для верификации: /verify ");
                     }
                 });
-                put("verifications", new LinkedHashMap<String, String>());
+                put("bot", new LinkedHashMap<String, Object>() {
+                    {
+                        put("token", "Вставьте свой токен телеграмм бота, если не вставите, возможен спам в консоли");
+                        put("messages", new LinkedHashMap<String, String>() {
+                            {
+                                put("bot-enabled", "Установите true/false");
+                                put("bot-token-error", "Установите токен для бота в конфиге!");
+                                put("start-message", "Привет! Ты в телеграмм боте плагина NeoProtect. Данный плагин позволяет получать уведомления о рейдах на приват.");
+                                put("start-button-text", "Как подключить?");
+                                put("start-chat-id", "Ваш айди чата: {chat_id}");
+                                put("verification-success", "Верификация завершена.");
+                                put("tutorial", "Для подключения аккаунта введите команду /verify на сервере!");
+                                put("verify-code", "Ваш код для верификации: /verify ");
+                            }
+                        });
+                        put("verifications", new LinkedHashMap<String, String>());
+                    }
+                });
+                put("notifications", new LinkedHashMap<String, Boolean>() {
+                    {
+                        put("PlayerName", false);
+                    }
+                });
+
+                put("form", new LinkedHashMap<String, Object>() {
+                    {
+                        put("region-management-title", "Управление регионом");
+                        put("add-player-title", "Добавить игрока");
+                        put("add-player-placeholder", "Введите имя игрока");
+                        put("remove-player-title", "Удалить игрока");
+                        put("remove-player-placeholder", "Введите имя игрока");
+                        put("transfer-ownership-title", "Передать владение");
+                        put("transfer-ownership-placeholder", "Введите имя нового владельца");
+                        put("notification-settings-title", "Настройки уведомлений");
+                        put("notification-toggle", "Получать уведомления в Telegram");
+                        put("save-settings-button", "Сохранить настройки");
+                        put("close-button", "Закрыть");
+                    }
+                });
             }
         };
     }
@@ -98,7 +155,28 @@ public class NeoProtect extends PluginBase implements Listener {
                 return false;
             }
         }
+
+        if (sender instanceof Player) {
+            Player player = (Player) sender;
+            if (command.getName().equalsIgnoreCase("protect")) {
+                checkPlayerRegion(player);
+                return true;
+            }
+        }
         return false;
+    }
+
+    private void toggleTelegramNotifications(Player player) {
+        String playerName = player.getName();
+        boolean currentSetting = config.getBoolean("notifications." + playerName, false);
+        config.set("notifications." + playerName, !currentSetting);
+        config.save();
+
+        String message = !currentSetting
+                ? "Настройки Telegram-уведомлений включены."
+                : "Настройки Telegram-уведомлений отключены.";
+
+        player.sendMessage(TextFormat.GREEN + message);
     }
 
     public void verifyTelegramCode(String code, Long chatId) {
@@ -116,6 +194,16 @@ public class NeoProtect extends PluginBase implements Listener {
 
     public Long getChatIdByPlayerName(String playerName) {
         return config.getLong("verifications." + playerName);
+    }
+
+    public String getPlayerNameByChatId(Long chatId) {
+        for (String playerName : config.getSection("verifications").getKeys(false)) {
+            Long savedChatId = config.getLong("verifications." + playerName);
+            if (savedChatId.equals(chatId)) {
+                return playerName;
+            }
+        }
+        return null;
     }
 
     public TgBot getTgBot() {
@@ -137,7 +225,6 @@ public class NeoProtect extends PluginBase implements Listener {
 
         public boolean isValid() {
             return System.currentTimeMillis() < expiryTime;
-
         }
     }
 
@@ -145,5 +232,32 @@ public class NeoProtect extends PluginBase implements Listener {
         Random random = new Random();
         int code = 1000 + random.nextInt(9000);
         return String.valueOf(code);
+    }
+
+    public void checkPlayerRegion(Player player) {
+        Location playerLocation = player.getLocation();
+        for (Map.Entry<String, List<Areas>> entry : map.entrySet()) {
+            String owner = entry.getKey();
+            List<Areas> areas = entry.getValue();
+            for (Areas area : areas) {
+                Location areaLocation = area.getLocation();
+                if (areaLocation != null) {
+                    int radius = listener.getProtectionRadius(area.getBlockId());
+                    if (playerLocation.distance(areaLocation) < radius) {
+                        if (owner.equals(player.getName())) {
+                            new RegionFormManager(this).sendRegionManagementForm(player, area);
+                        } else {
+                            player.sendMessage("Вы не являетесь владельцем этого региона.");
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+        player.sendMessage("Рядом с вами нет регионов.");
+    }
+
+    public String getConfigText(String path, String defaultValue) {
+        return config.getString(path, defaultValue);
     }
 }

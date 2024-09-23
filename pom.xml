@@ -25,6 +25,13 @@
       <systemPath>${basedir}/lib/patched.jar</systemPath>
     </dependency>
     <dependency>
+      <groupId>com.github.MEFRREEX</groupId>
+      <artifactId>FormConstructor</artifactId>
+      <version>2.0.3</version>
+      <scope>system</scope>
+      <systemPath>${basedir}/lib/form.jar</systemPath>
+    </dependency>
+    <dependency>
       <groupId>com.github.pengrad</groupId>
       <artifactId>java-telegram-bot-api</artifactId>
       <version>7.9.1</version>

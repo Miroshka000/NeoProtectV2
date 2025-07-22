@@ -26,15 +26,17 @@ public class Stream {
             plugin.getLogger().info("Сохранения приватов...");
             FileInputStream fis = new FileInputStream(plugin.getDataFolder() + File.separator + dataFile);
             ObjectInputStream ois = new ObjectInputStream(fis);
-            plugin.map = (HashMap<String, List<Areas>>) ois.readObject();
+            HashMap<String, List<Areas>> loadedMap = (HashMap<String, List<Areas>>) ois.readObject();
+            plugin.getRegionMap().clear();
+            plugin.getRegionMap().putAll(loadedMap);
             ois.close();
             plugin.getLogger().info("Данные приватов сохранены!");
         } catch (FileNotFoundException e) {
             plugin.getLogger().info("Данные приватов не найдены!");
-            plugin.map = new HashMap<>();
+            plugin.getRegionMap().clear();
         } catch (Exception e) {
             plugin.getLogger().critical("Произошла ошибка: " + Arrays.toString(e.getStackTrace()));
-            plugin.map = new HashMap<>();
+            plugin.getRegionMap().clear();
         }
     }
 
@@ -43,7 +45,7 @@ public class Stream {
             plugin.getLogger().info("Сохранения приватов...");
             FileOutputStream fos = new FileOutputStream(plugin.getDataFolder() + File.separator + dataFile);
             ObjectOutputStream oos = new ObjectOutputStream(fos);
-            oos.writeObject(plugin.map);
+            oos.writeObject(plugin.getRegionMap());
             oos.close();
             plugin.getLogger().info("Данные приватов сохранены!");
         } catch (Exception e) {

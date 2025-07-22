@@ -1,5 +1,6 @@
 package ru.SocialMoods.Storage;
 
+import cn.nukkit.Server;
 import cn.nukkit.level.Location;
 
 import java.io.Serializable;
@@ -13,6 +14,7 @@ public class Areas implements Serializable {
     private double x;
     private double y;
     private double z;
+    private String levelName;
 
     public Areas(Location location, int blockId) {
         this.blockId = blockId;
@@ -20,10 +22,11 @@ public class Areas implements Serializable {
         this.x = location.x;
         this.y = location.y;
         this.z = location.z;
+        this.levelName = location.getLevel().getName();
     }
 
     public Location getLocation() {
-        return new Location(x,y,z);
+        return new Location(x, y, z, Server.getInstance().getLevelByName(levelName));
     }
 
     public int getBlockId() {

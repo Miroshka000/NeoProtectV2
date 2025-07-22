@@ -1,9 +1,12 @@
 name: NeoProtect
 main: ru.SocialMoods.NeoProtect
-version: "2.0.1"
+version: "${version}"
 api: ["1.0.0"]
-description: Анархичные приваты - для каждого. От SkyStudio
+description: Анархичные приваты - для каждого.
 depend: ["FormConstructor"]
+authors:
+  - Miroshka/ForgePlugins Studio
+  - SocialMoods
 commands:
   verify:
     description: "Подтвердить свой Telegram"

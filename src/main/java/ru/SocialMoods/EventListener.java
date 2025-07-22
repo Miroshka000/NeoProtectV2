@@ -137,7 +137,7 @@ public class EventListener implements Listener {
     }
 
     private String getOwnerByLocation(Location loc) {
-        Set<Entry<String, List<Areas>>> set = this.plugin.map.entrySet();
+        Set<Entry<String, List<Areas>>> set = this.plugin.getRegionMap().entrySet();
         for (Entry<String, List<Areas>> entry : set) {
             List<Areas> areas = entry.getValue();
             for (Areas area : areas) {
@@ -150,18 +150,18 @@ public class EventListener implements Listener {
     }
 
     private int getNumPlayerProtections(Player player) {
-        List<Areas> list = this.plugin.map.get(player.getName());
+        List<Areas> list = this.plugin.getRegionMap().get(player.getName());
         return list != null ? list.size() : 0;
     }
 
     private void playerPlaceProtection(Location loc, Player player, int blockId) {
-        List<Areas> list = this.plugin.map.getOrDefault(player.getName(), new ArrayList<>());
+        List<Areas> list = this.plugin.getRegionMap().getOrDefault(player.getName(), new ArrayList<>());
         list.add(new Areas(loc, blockId));
-        this.plugin.map.put(player.getName(), list);
+        this.plugin.getRegionMap().put(player.getName(), list);
     }
 
     private boolean playerRemoveProtection(Location loc, Player player) {
-        List<Areas> list = this.plugin.map.get(player.getName());
+        List<Areas> list = this.plugin.getRegionMap().get(player.getName());
         if (list != null) {
             Iterator<Areas> iterator = list.iterator();
             while (iterator.hasNext()) {
@@ -176,7 +176,7 @@ public class EventListener implements Listener {
     }
 
     public void addPlayerToRegion(String owner, String playerToAdd, Location loc) {
-        List<Areas> areas = this.plugin.map.get(owner);
+        List<Areas> areas = this.plugin.getRegionMap().get(owner);
         if (areas != null) {
             for (Areas area : areas) {
                 if (area.getLocation().equals(loc)) {
@@ -192,7 +192,7 @@ public class EventListener implements Listener {
     }
 
     public void removePlayerFromRegion(String owner, String playerToRemove, Location loc) {
-        List<Areas> areas = this.plugin.map.get(owner);
+        List<Areas> areas = this.plugin.getRegionMap().get(owner);
         if (areas != null) {
             for (Areas area : areas) {
                 if (area.getLocation().equals(loc)) {
@@ -208,16 +208,16 @@ public class EventListener implements Listener {
     }
 
     public void transferRegionOwnership(String currentOwner, String newOwner, Location loc) {
-        List<Areas> areas = this.plugin.map.get(currentOwner);
+        List<Areas> areas = this.plugin.getRegionMap().get(currentOwner);
         if (areas != null) {
             Iterator<Areas> iterator = areas.iterator();
             while (iterator.hasNext()) {
                 Areas area = iterator.next();
                 if (area.getLocation().equals(loc)) {
                     iterator.remove();
-                    List<Areas> newOwnerAreas = this.plugin.map.getOrDefault(newOwner, new ArrayList<>());
+                    List<Areas> newOwnerAreas = this.plugin.getRegionMap().getOrDefault(newOwner, new ArrayList<>());
                     newOwnerAreas.add(area);
-                    this.plugin.map.put(newOwner, newOwnerAreas);
+                    this.plugin.getRegionMap().put(newOwner, newOwnerAreas);
 
                     Player currentOwnerPlayer = this.plugin.getServer().getPlayer(currentOwner);
                     if (currentOwnerPlayer != null) {
@@ -236,7 +236,7 @@ public class EventListener implements Listener {
     }
 
     private boolean playerInRangeProtection(Location loc, Player player) {
-        Set<Entry<String, List<Areas>>> set = this.plugin.map.entrySet();
+        Set<Entry<String, List<Areas>>> set = this.plugin.getRegionMap().entrySet();
         for (Entry<String, List<Areas>> entry : set) {
             String owner = entry.getKey();
             List<Areas> areas = entry.getValue();
@@ -256,7 +256,7 @@ public class EventListener implements Listener {
     }
 
     private boolean blockInProtection(Location loc) {
-        Set<Entry<String, List<Areas>>> set = this.plugin.map.entrySet();
+        Set<Entry<String, List<Areas>>> set = this.plugin.getRegionMap().entrySet();
         for (Entry<String, List<Areas>> entry : set) {
             List<Areas> areas = entry.getValue();
             for (Areas area : areas) {
